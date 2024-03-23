@@ -1,6 +1,6 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
-const fs = require('fs');
+const { chromium } = require('playwright');
+const fs = require('fs/promises');
 
 const app = express();
 
@@ -22,17 +22,7 @@ function generateRandomUSNumber() {
 }
 
 async function fetchOTP(emailId) {
-    const browser = await puppeteer.launch({
-        args: [
-            "--disable-setuid-sandbox",
-            "--no-sandbox",
-            "--single-process",
-            "--no-zygote",
-        ],
-        executablePath: process.env.NODE_ENV === "production"
-            ? process.env.PUPPETEER_EXECUTABLE_PATH
-            : puppeteer.executablePath(),
-    });
+    const browser = await chromium.launch();
     const page = await browser.newPage();
 
     try {
@@ -58,56 +48,43 @@ async function fetchOTP(emailId) {
 }
 
 async function getEmail() {
-    const browser = await puppeteer.launch({
-        args: [
-            "--disable-setuid-sandbox",
-            "--no-sandbox",
-            "--single-process",
-            "--no-zygote",
-        ],
-        executablePath: process.env.NODE_ENV === "production"
-            ? process.env.PUPPETEER_EXECUTABLE_PATH
-            : puppeteer.executablePath(),
-    });
+    const browser = await chromium.launch();
     const page = await browser.newPage();
     
-    try {
-        await page.goto('https://generator.email/email-generator');
-        
-        // Wait for the email to load
-        await page.waitForSelector('#email_ch_text');
-        
-        // Get the email text
-        const email = await page.evaluate(() => {
-            return document.getElementById('email_ch_text').innerText.trim();
-        });
+    await page.goto('https://generator.email/email-generator');
+    
+    // Wait for the email to load
+    await page.waitForSelector('#email_ch_text');
+    
+    // Get the email text
+    const email = await page.evaluate(() => {
+        return document.getElementById('email_ch_text').innerText.trim();
+    });
 
-        return email;
-    } catch (error) {
-        console.error('Error occurred while fetching email:', error);
-        return null;
-    } finally {
-        await browser.close();
-    }
+    await browser.close();
+
+    return email;
 }
 
 async function saveEmail(email) {
-    // Check if file exists
-    let existingEmails = [];
-    if (fs.existsSync('emails.txt')) {
-        existingEmails = fs.readFileSync('emails.txt', 'utf8').trim().split('\n');
-    }
-
-    // Check if email already exists
-    if (!existingEmails.includes(email)) {
-        fs.appendFileSync('emails.txt', email + '\n');
+    try {
+        // Check if file exists
+        const existingEmails = await fs.readFile('emails.txt', 'utf8');
+        const emailsArray = existingEmails.trim().split('\n');
+        
+        // Check if email already exists
+        if (!emailsArray.includes(email)) {
+            await fs.appendFile('emails.txt', email + '\n');
+        }
+    } catch (error) {
+        console.error('Error while saving email:', error);
     }
 }
 
 app.get('/generate', async (req, res) => {
     try {
         const email = await getEmail();
-        saveEmail(email);
+        await saveEmail(email);
         res.send(email);
     } catch (error) {
         console.error('Error:', error);
@@ -137,7 +114,7 @@ app.get('/randomus', (req, res) => {
     res.send(randomUSNumber);
 });
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3500;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
