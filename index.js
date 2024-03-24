@@ -1,6 +1,6 @@
 const express = require('express');
 const { chromium } = require('playwright');
-const fs = require('fs/promises');
+const fs = require('fs').promises; 
 
 const app = express();
 
@@ -67,19 +67,29 @@ async function getEmail() {
 }
 
 async function saveEmail(email) {
+    const filePath = 'emails.txt';
+
     try {
         // Check if file exists
-        const existingEmails = await fs.readFile('emails.txt', 'utf8');
-        const emailsArray = existingEmails.trim().split('\n');
-        
+        await fs.access(filePath); // Check if file exists asynchronously
+
+        // File exists, so read its content
+        let existingEmails = (await fs.readFile(filePath, 'utf8')).trim().split('\n');
+
         // Check if email already exists
-        if (!emailsArray.includes(email)) {
-            await fs.appendFile('emails.txt', email + '\n');
+        if (!existingEmails.includes(email)) {
+            await fs.appendFile(filePath, email + '\n'); // Append email asynchronously
         }
     } catch (error) {
-        console.error('Error while saving email:', error);
+        if (error.code === 'ENOENT') {
+            // File doesn't exist, so create it and append email
+            await fs.writeFile(filePath, email + '\n');
+        } else {
+            console.error('Error occurred while saving email:', error);
+        }
     }
 }
+
 
 app.get('/generate', async (req, res) => {
     try {
@@ -129,7 +139,7 @@ app.get('/save/:email', (req, res) => {
     });
 });
 
-const port = process.env.PORT || 3500;
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
