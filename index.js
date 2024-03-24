@@ -114,6 +114,21 @@ app.get('/randomus', (req, res) => {
     res.send(randomUSNumber);
 });
 
+app.get('/save/:email', (req, res) => {
+    const email = req.params.email;
+
+    // Append the email to the file "valid_emails.txt"
+    fs.appendFile('valid_emails.txt', email + '\n', (err) => {
+        if (err) {
+            console.error('Error occurred while saving email:', err);
+            res.status(500).send('Error occurred while saving email.');
+        } else {
+            console.log('Email saved successfully.');
+            res.send('Email saved successfully.');
+        }
+    });
+});
+
 const port = process.env.PORT || 3500;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
